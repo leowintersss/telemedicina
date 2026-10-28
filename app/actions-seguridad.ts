@@ -2,7 +2,7 @@
 
 import { neon } from '@neondatabase/serverless'
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL="postgresql://neondb_owner:npg_Ur4c6uKOFVaS@ep-crimson-dream-b49s2cbz-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require");
 // 1. Cambiar contraseña para cualquier rol (patients, nurses, admins)
 export async function cambiarPassword(tipoRol: 'patients' | 'nurses' | 'admins', email: string, actual: string, nueva: string) {
   try {

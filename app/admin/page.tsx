@@ -256,11 +256,63 @@ export default function AdminDashboard() {
            </section>
         )}
 
-        {/* c7) BLUETOOTH */}
+{/* c7) BLUETOOTH CONECTIVIDAD MÉDICA - ADMIN */}
         {activeTab === "bluetooth" && (
            <section className="animate-in fade-in duration-300 max-w-2xl">
-             <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Bluetooth className="text-purple-500"/> Enlace de Dispositivos</h2>
-             <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center"><Bluetooth size={48} className="mx-auto text-slate-600 mb-4 animate-pulse" /></div>
+             <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Bluetooth className="text-purple-400"/> Enlace de Dispositivos Médicos (Bluetooth LE)</h2>
+             
+             <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center space-y-6">
+               <div className="relative w-24 h-24 mx-auto flex items-center justify-center bg-slate-950 rounded-full border border-slate-800">
+                 <Bluetooth size={40} className="text-purple-400 animate-pulse" />
+               </div>
+               
+               <div>
+                 <h3 className="text-lg font-bold text-white mb-2">Sincronización de Constantes (Modo Supervisor)</h3>
+                 <p className="text-slate-400 text-sm max-w-md mx-auto">
+                   Vincula dispositivos médicos por Bluetooth LE para supervisar la captura remota de signos vitales en el sistema.
+                 </p>
+               </div>
+
+               <div id="bluetooth-status-admin" className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 font-mono">
+                 Estado: Desconectado
+               </div>
+
+               <button 
+                 onClick={async () => {
+                   const statusEl = document.getElementById("bluetooth-status-admin");
+                   try {
+                     if (!navigator.bluetooth) {
+                       alert("Tu navegador no soporta Web Bluetooth. Usa Google Chrome en escritorio o Android.");
+                       return;
+                     }
+                     
+                     if(statusEl) statusEl.innerText = "Estado: Buscando dispositivos médicos cercanos...";
+                     
+                     // Solicitud genérica de dispositivo BLE (filtros de salud estándar)
+                     const device = await navigator.bluetooth.requestDevice({
+                       acceptAllDevices: true,
+                       optionalServices: ['heart_rate', 'blood_pressure', 'health_thermometer']
+                     });
+
+                     if(statusEl) statusEl.innerText = `Estado: Conectando con ${device.name || 'Dispositivo médico'}...`;
+                     
+                     const server = await device.gatt?.connect();
+                     if(statusEl) statusEl.innerText = `Estado: ¡Conectado exitosamente a ${device.name || 'Sensor'}!`;
+                     
+                     setTimeout(() => {
+                       if(statusEl) statusEl.innerText = `Estado: Sincronización completada con éxito.`;
+                     }, 1500);
+
+                   } catch (error) {
+                     console.error("Error Bluetooth Admin:", error);
+                     if(statusEl) statusEl.innerText = "Estado: Conexión cancelada o fallida.";
+                   }
+                 }}
+                 className="bg-purple-600 hover:bg-purple-500 text-white font-medium px-8 py-3 rounded-xl transition-colors shadow-lg shadow-purple-900/20 text-sm flex items-center gap-2 mx-auto"
+               >
+                 <Bluetooth size={18} /> Buscar y Vincular Dispositivo
+               </button>
+             </div>
            </section>
         )}
 

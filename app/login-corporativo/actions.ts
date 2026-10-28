@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { cookies } from "next/headers";
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL="postgresql://neondb_owner:npg_Ur4c6uKOFVaS@ep-crimson-dream-b49s2cbz-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require");
 
 export async function loginStaff(formData: FormData) {
   const email = formData.get("email") as string;

@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// ==========================================
+// MÓDULO DE PERSONAL Y ADMINS (c9 y c10)
+// ==========================================
 export async function registrarEnfermera(formData: FormData) {
   try {
     const nombre = formData.get("nombre") as string;
@@ -16,8 +19,12 @@ export async function registrarEnfermera(formData: FormData) {
       password = Math.random().toString(36).slice(-8);
     }
 
+    await sql`
+      INSERT INTO nurses (nombre_completo, email, password_hash)
+      VALUES (${nombre}, ${email}, ${password})
+    `;
+
     revalidatePath("/admin");
-    
     return { 
       success: true, 
       message: `Enfermera ${nombre} registrada con éxito.`,
@@ -25,16 +32,13 @@ export async function registrarEnfermera(formData: FormData) {
     };
   } catch (error) {
     console.error("Error al registrar enfermera:", error);
-    return { success: false, message: "Error al registrar en la base de datos." };
+    return { success: false, message: "Error al registrar. Verifica que el correo no esté duplicado." };
   }
 }
 
 export async function obtenerEnfermeras() {
   try {
-    return [
-      { id: 1, nombre: "Ana López", email: "ana@acompanat.com", estado: "Activa" },
-      { id: 2, nombre: "María Pérez", email: "maria@acompanat.com", estado: "Activa" }
-    ];
+    return await sql`SELECT id, nombre_completo, email FROM nurses ORDER BY id DESC`;
   } catch (error) {
     return [];
   }
@@ -42,10 +46,57 @@ export async function obtenerEnfermeras() {
 
 export async function obtenerCoAminstradores() {
   try {
-    return [
-      { id: 1, nombre: "Carlos Admin", email: "carlos@acompanat.com", rol: "Co-Admin" }
-    ];
+    return await sql`SELECT id, nombre_completo, email FROM admins ORDER BY id ASC`;
   } catch (error) {
     return [];
   }
+}
+
+// ==========================================
+// MÓDULOS MÉDICOS (Heredados de Enfermería)
+// ==========================================
+export async function buscarPacientes(query: string) {
+  try {
+    const search = `%${query}%`;
+    return await sql`
+      SELECT id, nombre_completo, curp, email 
+      FROM patients 
+      WHERE nombre_completo ILIKE ${search} OR curp ILIKE ${search} OR email ILIKE ${search}
+      LIMIT 10
+    `;
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function registrarSignosAdmin(data: { patientId: number, presion: string, frecuenciaCardiaca: number, temperatura: number, observaciones: string }) {
+  try {
+    await sql`
+      INSERT INTO vital_signs (patient_id, presion, frecuencia_cardiaca, temperatura, observaciones) 
+      VALUES (${data.patientId}, ${data.presion}, ${data.frecuenciaCardiaca}, ${data.temperatura}, ${data.observaciones || null})
+    `;
+    revalidatePath("/admin");
+    return { success: true, message: "Signos vitales registrados en el expediente (Vía Admin)." };
+  } catch (error) {
+    return { success: false, message: "Error al registrar signos vitales." };
+  }
+}
+
+export async function obtenerHistorialPaciente(pacienteId: number) {
+  try {
+    return await sql`
+      SELECT * FROM vital_signs 
+      WHERE patient_id = ${pacienteId}
+      ORDER BY created_at DESC 
+      LIMIT 10
+    `;
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function obtenerCitasPaciente(pacienteId: number) {
+  return [
+    { id: 1, fecha: "2026-11-15 10:00", tipo: "Revisión General", estado: "Pendiente" }
+  ];
 }

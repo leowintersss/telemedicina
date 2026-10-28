@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
-import { User, Lock, Calendar, LogOut, Search, Activity, Bluetooth, FileText, CheckCircle } from "lucide-react";
-import { buscarPacientes, registrarSignosEnfermeria, actualizarPerfilEnfermera, cambiarPasswordEnfermera } from "./actions";
+import { User, Lock, LogOut, Search, Activity, Bluetooth, FileText, CheckCircle, Filter } from "lucide-react";
+import { buscarPacientes, registrarSignosEnfermeria, obtenerHistorialPaciente, obtenerCitasPaciente } from "./actions";
 
 export default function EnfermeriaDashboard() {
   const [isPending, startTransition] = useTransition();
@@ -10,9 +10,12 @@ export default function EnfermeriaDashboard() {
   const [fechaCDMX, setFechaCDMX] = useState("");
   const [mensajeGlobal, setMensajeGlobal] = useState<{ texto: string; tipo: "exito" | "error" } | null>(null);
 
-  // Estados de Búsqueda (b3)
   const [queryBusqueda, setQueryBusqueda] = useState("");
   const [resultadosPacientes, setResultadosPacientes] = useState<any[]>([]);
+  const [pacienteSeleccionado, setPacienteSeleccionado] = useState<{id: number, nombre_completo: string, email: string} | null>(null);
+
+  const [historialSignos, setHistorialSignos] = useState<any[]>([]);
+  const [historialCitas, setHistorialCitas] = useState<any[]>([]);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -27,6 +30,15 @@ export default function EnfermeriaDashboard() {
     setResultadosPacientes(res);
   };
 
+  const cargarHistorial = async (pacienteId: number) => {
+    startTransition(async () => {
+      const signos = await obtenerHistorialPaciente(pacienteId);
+      const citas = await obtenerCitasPaciente(pacienteId);
+      setHistorialSignos(signos);
+      setHistorialCitas(citas);
+    });
+  };
+
   const handleSignosSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMensajeGlobal(null);
@@ -34,18 +46,16 @@ export default function EnfermeriaDashboard() {
     
     startTransition(async () => {
       const res = await registrarSignosEnfermeria({
-        pacienteId: Number(formData.get("pacienteId")),
-        enfermeraId: 1, // ID demo enfermera
-        presionSistolica: Number(formData.get("sistolica")) || undefined,
-        presionDiastolica: Number(formData.get("diastolica")) || undefined,
-        saturacionOxigeno: Number(formData.get("oxigeno")) || undefined,
-        frecuenciaCardiaca: Number(formData.get("pulso")) || undefined,
-        glucosa: Number(formData.get("glucosa")) || undefined,
-        temperatura: Number(formData.get("temperatura")) || undefined,
-        notas: formData.get("notas") as string,
+        patientId: Number(formData.get("patientId")),
+        presion: formData.get("presion") as string,
+        frecuenciaCardiaca: Number(formData.get("frecuenciaCardiaca")),
+        temperatura: Number(formData.get("temperatura")),
+        observaciones: formData.get("observaciones") as string,
       });
       setMensajeGlobal({ texto: res.message, tipo: res.success ? "exito" : "error" });
-      if(res.success) (e.target as HTMLFormElement).reset();
+      if(res.success) {
+        (e.target as HTMLFormElement).reset();
+      }
     });
   };
 
@@ -69,7 +79,6 @@ export default function EnfermeriaDashboard() {
             </button>
           ))}
           <hr className="border-slate-800 my-4" />
-          <button onClick={() => { setActiveTab("perfil"); setMensajeGlobal(null); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all ${activeTab === 'perfil' ? 'bg-rose-600 text-white' : 'hover:bg-slate-800'}`}><User size={18}/> Mi Perfil</button>
           <button onClick={() => { setActiveTab("seguridad"); setMensajeGlobal(null); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all ${activeTab === 'seguridad' ? 'bg-rose-600 text-white' : 'hover:bg-slate-800'}`}><Lock size={18}/> Contraseña</button>
         </nav>
         <div className="p-4 border-t border-rose-900/30">
@@ -77,12 +86,12 @@ export default function EnfermeriaDashboard() {
         </div>
       </aside>
 
-      {/* Área de Contenido Principal */}
+      {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-end mb-8 border-b border-slate-800 pb-4">
           <div>
-            <h1 className="text-3xl font-bold text-white">Hola, Enfermera Demo</h1>
-            <p className="text-slate-400 mt-1">Estación de Guardia y Telemonitoreo.</p>
+            <h1 className="text-3xl font-bold text-white">Hola, Enfermera</h1>
+            <p className="text-slate-400 mt-1">Estación de Guardia.</p>
           </div>
           <div className="text-right">
             <p className="text-sm font-medium text-rose-400">Ciudad de México</p>
@@ -90,35 +99,48 @@ export default function EnfermeriaDashboard() {
           </div>
         </header>
 
+        {pacienteSeleccionado && (
+          <div className="mb-6 p-4 bg-rose-950/30 border border-rose-900/50 rounded-xl flex justify-between items-center max-w-4xl">
+            <div>
+              <p className="text-xs text-rose-400 uppercase font-bold tracking-wider mb-1">Paciente en atención</p>
+              <p className="text-white font-medium">{pacienteSeleccionado.nombre_completo} (ID: {pacienteSeleccionado.id})</p>
+            </div>
+            <button onClick={() => setPacienteSeleccionado(null)} className="text-xs text-slate-400 hover:text-white border border-slate-700 px-3 py-1.5 rounded-lg transition-colors">Desmarcar</button>
+          </div>
+        )}
+
         {mensajeGlobal && (
           <div className={`mb-6 p-4 flex items-center gap-3 rounded-xl border text-sm font-medium max-w-4xl ${mensajeGlobal.tipo === 'exito' ? 'bg-emerald-950/30 border-emerald-800 text-emerald-400' : 'bg-rose-950/30 border-rose-800 text-rose-400'}`}>
             <CheckCircle size={18} /> {mensajeGlobal.texto}
           </div>
         )}
 
-        {/* b3) Buscar Paciente */}
+        {/* BUSCAR */}
         {activeTab === "buscar" && (
            <section className="animate-in fade-in duration-300 max-w-4xl">
-             <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Search className="text-rose-500"/> Búsqueda de Pacientes</h2>
+             <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Search className="text-rose-500"/> Búsqueda</h2>
              <form onSubmit={handleBuscar} className="flex gap-4 mb-8">
-               <input type="text" value={queryBusqueda} onChange={(e)=>setQueryBusqueda(e.target.value)} placeholder="Buscar por Nombre, Correo o CURP..." className="flex-1 bg-slate-900 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-3 text-white outline-none text-sm" />
+               <input type="text" value={queryBusqueda} onChange={(e)=>setQueryBusqueda(e.target.value)} placeholder="Buscar por Nombre, CURP o Correo..." className="flex-1 bg-slate-900 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-3 text-white outline-none text-sm" />
                <button type="submit" className="bg-rose-600 hover:bg-rose-500 text-white font-medium px-6 py-3 rounded-xl transition-colors">Buscar</button>
              </form>
              
              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
                <table className="w-full text-sm text-left">
                  <thead className="bg-slate-950 text-slate-400">
-                   <tr><th className="px-6 py-3">Nombre</th><th className="px-6 py-3">CURP</th><th className="px-6 py-3">Acción</th></tr>
+                   <tr><th className="px-6 py-3">Nombre</th><th className="px-6 py-3">CURP</th><th className="px-6 py-3 text-right">Acción</th></tr>
                  </thead>
                  <tbody>
                    {resultadosPacientes.length === 0 ? (
-                     <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-500">Realiza una búsqueda para ver pacientes (Asegúrate de tener la tabla pacientes_datos_generales)</td></tr>
+                     <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-500">Realiza una búsqueda</td></tr>
                    ) : (
                      resultadosPacientes.map(p => (
                        <tr key={p.id} className="border-t border-slate-800 hover:bg-slate-800/50">
-                         <td className="px-6 py-4 text-white font-medium">{p.nombre}</td>
+                         <td className="px-6 py-4 text-white font-medium">{p.nombre_completo}</td>
                          <td className="px-6 py-4 text-slate-400">{p.curp}</td>
-                         <td className="px-6 py-4"><button onClick={() => setActiveTab("signos")} className="text-rose-400 hover:text-rose-300 font-medium">Capturar Signos</button></td>
+                         <td className="px-6 py-4 flex gap-3 justify-end">
+                           <button onClick={() => { setPacienteSeleccionado(p); cargarHistorial(p.id); setActiveTab("historial"); }} className="text-slate-400 hover:text-white font-medium text-xs border border-slate-700 px-3 py-1 rounded">Historial</button>
+                           <button onClick={() => { setPacienteSeleccionado(p); setActiveTab("signos"); }} className="bg-rose-900/50 text-rose-300 hover:bg-rose-900 border border-rose-800 px-3 py-1 rounded font-medium text-xs">Capturar</button>
+                         </td>
                        </tr>
                      ))
                    )}
@@ -128,68 +150,82 @@ export default function EnfermeriaDashboard() {
            </section>
         )}
 
-        {/* b5 y b6) Captura Signos Vitales */}
+        {/* SIGNOS */}
         {activeTab === "signos" && (
            <section className="animate-in fade-in duration-300 max-w-4xl">
-             <div className="flex justify-between items-center mb-6">
-               <h2 className="text-xl font-bold flex items-center gap-2"><Activity className="text-rose-500"/> Registro de Constantes</h2>
-               <span className="text-xs bg-slate-900 text-slate-400 border border-slate-800 px-3 py-1.5 rounded-lg">ID Enfermera: 1 | {fechaCDMX}</span>
-             </div>
-
+             <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Activity className="text-rose-500"/> Constantes</h2>
              <form onSubmit={handleSignosSubmit} className="bg-slate-900 p-6 md:p-8 rounded-2xl border border-slate-800 space-y-6">
                <div>
-                 <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">ID del Paciente</label>
-                 <input type="number" name="pacienteId" required placeholder="Ej: 1" className="w-full max-w-xs bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-2.5 text-white outline-none text-sm" />
+                 <label className="block text-xs uppercase text-slate-400 mb-2">ID Paciente</label>
+                 <input type="number" name="patientId" defaultValue={pacienteSeleccionado?.id || ""} required className="w-full max-w-xs bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-2.5 text-white outline-none text-sm" />
                </div>
-
-               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                 {[{n: "sistolica", l: "Sistólica (mmHg)"}, {n: "diastolica", l: "Diastólica (mmHg)"}, {n: "oxigeno", l: "SpO2 (%)"}, {n: "pulso", l: "Pulso (LPM)"}, {n: "glucosa", l: "Glucosa (mg/dL)"}, {n: "temperatura", l: "Temp (°C)"}].map((c) => (
-                   <div key={c.n}>
-                     <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">{c.l}</label>
-                     <input type="number" step="0.1" name={c.n} className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-2.5 text-white outline-none text-sm" />
-                   </div>
-                 ))}
+               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                 <div>
+                   <label className="block text-xs uppercase text-slate-400 mb-2">Presión Arterial</label>
+                   <input type="text" name="presion" required placeholder="Ej: 120/80" className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-2.5 text-white outline-none text-sm" />
+                 </div>
+                 <div>
+                   <label className="block text-xs uppercase text-slate-400 mb-2">Frecuencia Cardíaca</label>
+                   <input type="number" name="frecuenciaCardiaca" required placeholder="LPM" className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-2.5 text-white outline-none text-sm" />
+                 </div>
+                 <div>
+                   <label className="block text-xs uppercase text-slate-400 mb-2">Temp (°C)</label>
+                   <input type="number" step="0.1" name="temperatura" required placeholder="Ej: 36.5" className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-2.5 text-white outline-none text-sm" />
+                 </div>
                </div>
-
                <div>
-                 <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Observaciones</label>
-                 <textarea name="notas" rows={3} className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl p-4 text-white outline-none text-sm" placeholder="Estado del paciente, síntomas, etc..." />
+                 <label className="block text-xs uppercase text-slate-400 mb-2">Observaciones</label>
+                 <textarea name="observaciones" rows={3} className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl p-4 text-white outline-none text-sm" />
                </div>
-
                <button type="submit" disabled={isPending} className="bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-medium px-8 py-3 rounded-xl transition-colors">
-                 {isPending ? "Guardando en Expediente..." : "Guardar Signos Vitales"}
+                 Guardar Signos
                </button>
              </form>
            </section>
         )}
 
-        {/* b4 y b8) Historial y Citas */}
+        {/* HISTORIAL */}
         {activeTab === "historial" && (
            <section className="animate-in fade-in duration-300 max-w-4xl">
-             <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FileText className="text-rose-500"/> Historial Clínico y Citas</h2>
-             <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-slate-400 text-sm">
-                Interfaz de filtrado de los últimos 10 registros lista para conectar a la tabla de pacientes_datos_generales.
-             </div>
+             <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><FileText className="text-rose-500"/> Historial Clínico</h2>
+             {!pacienteSeleccionado ? (
+               <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center"><p className="text-slate-400 mb-4">Selecciona un paciente en Buscar.</p></div>
+             ) : (
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                   <h3 className="font-bold text-white mb-4 border-b border-slate-800 pb-2">Últimos Registros (vital_signs)</h3>
+                   <div className="space-y-4">
+                     {isPending ? <p className="text-slate-500 text-sm">Cargando...</p> : historialSignos.length === 0 ? <p className="text-slate-500 text-sm">Sin registros.</p> : (
+                       historialSignos.map((s, idx) => (
+                         <div key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs">
+                           <span className="text-slate-400">{new Date(s.created_at).toLocaleDateString()}</span>
+                           <p className="text-slate-300 font-medium mt-1">PA: {s.presion} | FC: {s.frecuencia_cardiaca} | Temp: {s.temperatura}°C</p>
+                           {s.observaciones && <p className="text-slate-500 italic mt-1">"{s.observaciones}"</p>}
+                         </div>
+                       ))
+                     )}
+                   </div>
+                 </div>
+                 <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                   <h3 className="font-bold text-white mb-4 border-b border-slate-800 pb-2">Citas del Año</h3>
+                   <div className="space-y-3">
+                     {historialCitas.map((c, idx) => (
+                       <div key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs text-slate-300">
+                         <p className="font-bold text-white">{c.tipo}</p><p>{c.fecha}</p>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               </div>
+             )}
            </section>
         )}
 
-        {/* b7) Bluetooth */}
+        {/* BLUETOOTH / SEGURIDAD... */}
         {activeTab === "bluetooth" && (
            <section className="animate-in fade-in duration-300 max-w-2xl">
              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Bluetooth className="text-rose-500"/> Enlace de Dispositivos</h2>
-             <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center">
-                <Bluetooth size={48} className="mx-auto text-slate-600 mb-4" />
-                <p className="text-slate-300 mb-2">Buscando dispositivos médicos compatibles cercanos...</p>
-                <p className="text-xs text-slate-500">Asegúrate de que el baumanómetro u oxímetro esté encendido y en modo emparejamiento.</p>
-             </div>
-           </section>
-        )}
-
-        {/* b1 y b2) Perfil y Seguridad usan la misma lógica visual que pacientes, simplificado aquí para no saturar el archivo */}
-        {activeTab === "seguridad" && (
-           <section className="animate-in fade-in duration-300 max-w-2xl">
-             <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Lock className="text-rose-500"/> Seguridad</h2>
-             <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-slate-400 text-sm">Formulario de contraseñas de enfermería.</div>
+             <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center"><Bluetooth size={48} className="mx-auto text-slate-600 mb-4 animate-pulse" /></div>
            </section>
         )}
       </main>

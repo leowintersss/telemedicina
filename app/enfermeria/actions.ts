@@ -5,16 +5,14 @@ import { revalidatePath } from "next/cache";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// b3) Buscar pacientes por nombre, correo o CURP
+// b3) Buscar pacientes en la tabla 'patients'
 export async function buscarPacientes(query: string) {
   try {
     const search = `%${query}%`;
-    // Asumiendo que tu tabla principal de pacientes se llama 'pacientes' o 'pacientes_datos_generales'
-    // Ajusta el nombre de la tabla si en tu BD se llama distinto.
     const resultados = await sql`
-      SELECT id, nombre, curp, email, telefono 
-      FROM pacientes_datos_generales 
-      WHERE nombre ILIKE ${search} OR curp ILIKE ${search} OR email ILIKE ${search}
+      SELECT id, nombre_completo, curp, email 
+      FROM patients 
+      WHERE nombre_completo ILIKE ${search} OR curp ILIKE ${search} OR email ILIKE ${search}
       LIMIT 10
     `;
     return resultados;
@@ -24,87 +22,49 @@ export async function buscarPacientes(query: string) {
   }
 }
 
-// b5 y b6) Registrar signos vitales con ID de enfermera
-interface RegistroSignos {
-  pacienteId: number;
-  enfermeraId: number;
-  presionSistolica?: number;
-  presionDiastolica?: number;
-  frecuenciaCardiaca?: number;
-  saturacionOxigeno?: number;
-  glucosa?: number;
-  temperatura?: number;
-  notas?: string;
-}
-
-export async function registrarSignosEnfermeria(data: RegistroSignos) {
+// b5 y b6) Registrar signos en la tabla 'vital_signs'
+export async function registrarSignosEnfermeria(data: {
+  patientId: number;
+  presion: string;
+  frecuenciaCardiaca: number;
+  temperatura: number;
+  observaciones: string;
+}) {
   try {
-    let alertaNivel = "normal";
-
-    // Semáforo de riesgo
-    if ((data.saturacionOxigeno && data.saturacionOxigeno < 90) || (data.presionSistolica && data.presionSistolica >= 160)) {
-      alertaNivel = "critico";
-    } else if ((data.saturacionOxigeno && data.saturacionOxigeno <= 94) || (data.presionSistolica && data.presionSistolica >= 140)) {
-      alertaNivel = "advertencia";
-    }
-
-    // El CURRENT_TIMESTAMP de PostgreSQL guardará la hora, en el frontend la mostraremos en formato CDMX
     await sql`
-      INSERT INTO signos_vitales (
-        paciente_id,
-        presion_sistolica,
-        presion_diastolica,
-        frecuencia_cardiaca,
-        saturacion_oxigeno,
-        glucosa,
-        temperatura,
-        alerta_nivel,
-        origen,
-        notas
+      INSERT INTO vital_signs (
+        patient_id, presion, frecuencia_cardiaca, temperatura, observaciones
       ) VALUES (
-        ${data.pacienteId},
-        ${data.presionSistolica || null},
-        ${data.presionDiastolica || null},
-        ${data.frecuenciaCardiaca || null},
-        ${data.saturacionOxigeno || null},
-        ${data.glucosa || null},
-        ${data.temperatura || null},
-        ${alertaNivel},
-        ${`Enfermera ID:\${data.enfermeraId}`},
-        ${data.notas || null}
+        ${data.patientId}, ${data.presion}, ${data.frecuenciaCardiaca}, 
+        ${data.temperatura}, ${data.observaciones || null}
       )
     `;
-
     revalidatePath("/enfermeria");
-    return { success: true, message: `Signos guardados. Riesgo: ${alertaNivel.toUpperCase()}` };
+    return { success: true, message: "Signos vitales registrados en el expediente." };
   } catch (error) {
-    console.error("Error al guardar signos:", error);
+    console.error("Error BD Signos:", error);
     return { success: false, message: "Error al registrar signos vitales." };
   }
 }
 
-// b1) Actualizar perfil de enfermera
-export async function actualizarPerfilEnfermera(enfermeraId: number, formData: FormData) {
+// b4) Obtener Historial Clínico
+export async function obtenerHistorialPaciente(pacienteId: number) {
   try {
-    const telefono = formData.get("telefono") as string;
-    // Asumiendo tabla enfermeras_perfil o similar
-    // await sql`UPDATE enfermeras_perfil SET telefono = ${telefono} WHERE id = ${enfermeraId}`;
-    return { success: true, message: "Datos de contacto actualizados correctamente." };
+    const historial = await sql`
+      SELECT * FROM vital_signs 
+      WHERE patient_id = ${pacienteId}
+      ORDER BY created_at DESC 
+      LIMIT 10
+    `;
+    return historial;
   } catch (error) {
-    return { success: false, message: "Error al actualizar perfil." };
+    return [];
   }
 }
 
-// b2) Cambiar contraseña de enfermera
-export async function cambiarPasswordEnfermera(enfermeraId: number, formData: FormData) {
-  try {
-    const nueva = formData.get("passwordNueva") as string;
-    const confirmar = formData.get("passwordConfirmar") as string;
-    if (nueva !== confirmar) return { success: false, message: "Las contraseñas no coinciden." };
-    
-    // await sql`UPDATE enfermeras_login SET password_hash = ${nueva} WHERE id = ${enfermeraId}`;
-    return { success: true, message: "Contraseña actualizada de forma segura." };
-  } catch (error) {
-    return { success: false, message: "Error al cambiar contraseña." };
-  }
+// b8) Citas Simuladas (Placeholder)
+export async function obtenerCitasPaciente(pacienteId: number) {
+  return [
+    { id: 1, fecha: "2026-11-15 10:00", tipo: "Revisión General", estado: "Pendiente" }
+  ];
 }

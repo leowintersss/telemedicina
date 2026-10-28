@@ -13,15 +13,11 @@ export async function actualizarPerfilPaciente(pacienteId: number, formData: For
     const contactoEmergencia = formData.get("contactoEmergencia") as string;
     const telefonoEmergencia = formData.get("telefonoEmergencia") as string;
 
-    // Aquí usamos la tabla de datos médicos/opcionales que ya tienes en tu repo
     await sql`
-      UPDATE pacientes_datos_medicos 
-      SET alergias = ${alergias}, 
-          tipo_sangre = ${tipoSangre}, 
-          contacto_emergencia = ${contactoEmergencia}, 
-          telefono_emergencia = ${telefonoEmergencia},
-          fecha_actualizacion = CURRENT_TIMESTAMP
-      WHERE paciente_id = ${pacienteId}
+      UPDATE patients 
+      SET tipo_sangre = ${tipoSangre}, 
+          telefono = ${telefonoEmergencia}
+      WHERE id = ${pacienteId}
     `;
 
     revalidatePath("/paciente");
@@ -43,12 +39,10 @@ export async function cambiarPasswordPaciente(pacienteId: number, formData: Form
       return { success: false, message: "Las contraseñas nuevas no coinciden." };
     }
 
-    // Aquí iría la validación del hash de la contraseña actual. 
-    // Por ahora hacemos el UPDATE directo en tu tabla de login de pacientes
     await sql`
-      UPDATE pacientes_login 
-      SET password_hash = ${nueva} -- Ojo: En producción esto debe ir con bcrypt
-      WHERE paciente_id = ${pacienteId}
+      UPDATE patients 
+      SET password_hash = ${nueva}
+      WHERE id = ${pacienteId}
     `;
 
     return { success: true, message: "La contraseña se actualizó con éxito." };
@@ -58,14 +52,15 @@ export async function cambiarPasswordPaciente(pacienteId: number, formData: Form
   }
 }
 
-// a3) Consultar citas futuras
+// a3) Consultar citas futuras desde la BD Real
 export async function obtenerCitasFuturas(pacienteId: number) {
   try {
-    // Consulta a la tabla de citas filtrando por fecha mayor a hoy
     const citas = await sql`
-      SELECT * FROM citas 
-      WHERE paciente_id = ${pacienteId} AND fecha_cita >= CURRENT_DATE
-      ORDER BY fecha_cita ASC
+      SELECT c.id, c.fecha_cita, c.tipo_cita, c.estado, n.nombre_completo as enfermera
+      FROM citas c
+      LEFT JOIN nurses n ON c.nurse_id = n.id
+      WHERE c.patient_id = ${pacienteId} AND c.fecha_cita >= CURRENT_DATE
+      ORDER BY c.fecha_cita ASC
       LIMIT 5
     `;
     return citas;

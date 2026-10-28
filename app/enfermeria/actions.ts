@@ -62,9 +62,28 @@ export async function obtenerHistorialPaciente(pacienteId: number) {
   }
 }
 
-// b8) Citas Simuladas (Placeholder)
 export async function obtenerCitasPaciente(pacienteId: number) {
-  return [
-    { id: 1, fecha: "2026-11-15 10:00", tipo: "Revisión General", estado: "Pendiente" }
-  ];
+  try {
+    const citas = await sql`
+      SELECT id, fecha_cita, tipo_cita as tipo, estado 
+      FROM citas 
+      WHERE patient_id = ${pacienteId}
+      ORDER BY fecha_cita DESC
+    `;
+    
+    // Formateamos la fecha para que la interfaz roja y morada la lean directamente
+    return citas.map(c => ({
+      id: c.id,
+      fecha: new Date(c.fecha_cita).toLocaleString('es-MX', { 
+        timeZone: 'America/Mexico_City',
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }),
+      tipo: c.tipo,
+      estado: c.estado
+    }));
+  } catch (error) {
+    console.error("Error BD Citas:", error);
+    return [];
+  }
 }

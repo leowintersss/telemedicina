@@ -1,96 +1,59 @@
-'use client'
+"use client";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { loginStaff } from "./actions";
 
-import { useState } from 'react'
-import { loginCorporativo } from './actions'
-import { ShieldCheck, LogIn } from 'lucide-react'
+export default function LoginCorporativo() {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-export default function LoginCorporativoPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [mensaje, setMensaje] = useState('')
-  const [cargando, setCargando] = useState(false)
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setMensaje('')
-    setCargando(true)
-
-    const resultado = await loginCorporativo(email, password)
-    setMensaje(resultado.message)
-    setCargando(false)
-
-    if (resultado.success) {
-      window.location.href = resultado.redirect
-    }
-  }
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData(e.currentTarget);
+    
+    startTransition(async () => {
+      const res = await loginStaff(formData);
+      if (res.success) {
+        router.push(res.url!);
+      } else {
+        setError(res.message);
+      }
+    });
+  };
 
   return (
-    <main className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-slate-800 relative">
-      
-      {/* Indicador de Jerarquía */}
-      <div className="absolute top-6 right-6 bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1 rounded-full shadow-sm border border-amber-300">
-        Acceso Corporativo / Personal
-      </div>
-
-      <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-slate-800">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl relative overflow-hidden">
+        {/* Adorno superior sutil */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 to-purple-600"></div>
         
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-inner">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-900">Portal Corporativo</h1>
-          <p className="text-xs text-slate-500 mt-1">Acceso exclusivo para Administradores y Enfermería</p>
+        <div className="text-center mb-8 mt-2">
+          <h1 className="text-2xl font-bold text-white mb-1">AcompañaT <span className="text-slate-500 font-light">| Staff</span></h1>
+          <p className="text-slate-400 text-xs uppercase tracking-widest mt-2">Acceso Administrativo y Médico</p>
         </div>
+        
+        {error && <div className="mb-6 p-3 bg-rose-950/50 border border-rose-900 text-rose-400 text-sm rounded-lg text-center">{error}</div>}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Correo Corporativo *</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="personal@sistema.com"
-              className="w-full px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
+            <label className="block text-xs uppercase text-slate-400 mb-2">Correo Corporativo</label>
+            <input type="email" name="email" required className="w-full bg-slate-950 border border-slate-800 focus:border-slate-500 rounded-xl px-4 py-3 text-white outline-none text-sm transition-colors" />
           </div>
-
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Contraseña *</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
+            <label className="block text-xs uppercase text-slate-400 mb-2">Contraseña</label>
+            <input type="password" name="password" required className="w-full bg-slate-950 border border-slate-800 focus:border-slate-500 rounded-xl px-4 py-3 text-white outline-none text-sm transition-colors" />
           </div>
-
-          <button
-            type="submit"
-            disabled={cargando}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors shadow-sm flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
-          >
-            <LogIn className="w-4 h-4" />
-            <span>{cargando ? 'Verificando credenciales...' : 'Ingresar al Sistema'}</span>
+          <button type="submit" disabled={isPending} className="w-full bg-slate-200 hover:bg-white disabled:opacity-50 text-slate-900 font-bold py-3 rounded-xl transition-colors mt-4">
+            {isPending ? "Validando credenciales..." : "Ingresar al Sistema"}
           </button>
-
-          {mensaje && (
-            <p className={`text-xs text-center font-medium mt-3 p-3 rounded-lg ${mensaje.includes('éxito') || mensaje.includes('Bienvenido') ? 'bg-purple-50 text-purple-700' : 'bg-rose-50 text-rose-700'}`}>
-              {mensaje}
-            </p>
-          )}
-
-          <div className="text-center pt-2 space-y-2">
-            <div>
-              <a href="/login" className="text-xs text-emerald-600 hover:underline font-medium">
-                ← ¿Eres paciente? Inicia sesión aquí
-              </a>
-            </div>
-          </div>
         </form>
+        
+        <p className="mt-8 text-center text-xs text-slate-600">
+          Uso exclusivo para personal autorizado.
+        </p>
       </div>
-    </main>
-  )
+    </div>
+  );
 }

@@ -1,47 +1,31 @@
-'use server'
+"use server";
+import { neon } from "@neondatabase/serverless";
+import { cookies } from "next/headers";
 
-import { neon } from '@neondatabase/serverless'
+const sql = neon(process.env.DATABASE_URL!);
 
-const sql = neon(process.env.DATABASE_URL="postgresql://neondb_owner:npg_Ur4c6uKOFVaS@ep-crimson-dream-b49s2cbz-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require");
-export async function loginCorporativo(email: string, passwordInput: string) {
+export async function loginStaff(formData: FormData) {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+
   try {
-    const emailLimPIO = email.trim().toLowerCase()
-
-    // 1. Verificar si es Administrador
-    const adminCheck = await sql`
-      SELECT * FROM admins WHERE email = ${emailLimPIO}
-    `
-    if (adminCheck.length > 0) {
-      const admin = adminCheck[0]
-      if (admin.password_hash === passwordInput) {
-        return { success: true, rol: 'admin', nombre: admin.nombre_completo, redirect: '/admin' }
-      }
-      return { success: false, message: 'Contraseña incorrecta para Administrador.' }
+    const admin = await sql`SELECT id, nombre_completo FROM admins WHERE email = ${email} AND password_hash = ${password}`;
+    if (admin.length > 0) {
+      const cookieStore = await cookies();
+      cookieStore.set("session_user", JSON.stringify({ id: admin[0].id, role: "admin", nombre: admin[0].nombre_completo }), { httpOnly: true, path: '/' });
+      return { success: true, url: "/admin" };
     }
 
-    // 2. Verificar si es Enfermera
-    const nurseCheck = await sql`
-      SELECT * FROM nurses WHERE email = ${emailLimPIO}
-    `
-    if (nurseCheck.length > 0) {
-      const nurse = nurseCheck[0]
-      if (nurse.password_hash === passwordInput) {
-        return { success: true, rol: 'enfermeria', nombre: nurse.nombre_completo, redirect: '/enfermeria' }
-      }
-      return { success: false, message: 'Contraseña incorrecta para Enfermería.' }
+    const nurse = await sql`SELECT id, nombre_completo FROM nurses WHERE email = ${email} AND password_hash = ${password}`;
+    if (nurse.length > 0) {
+      const cookieStore = await cookies();
+      cookieStore.set("session_user", JSON.stringify({ id: nurse[0].id, role: "enfermera", nombre: nurse[0].nombre_completo }), { httpOnly: true, path: '/' });
+      return { success: true, url: "/enfermeria" };
     }
 
-    // 3. Verificar si por error es un Paciente intentando entrar aquí
-    const patientCheck = await sql`
-      SELECT * FROM patients WHERE email = ${emailLimPIO}
-    `
-    if (patientCheck.length > 0) {
-      return { success: false, message: 'Acceso denegado: Este login es exclusivo para personal corporativo. Utilice el acceso de pacientes.' }
-    }
-
-    return { success: false, message: 'Correo electrónico corporativo no registrado en el sistema.' }
-  } catch (error: unknown) {
-    const err = error as { message?: string }
-    return { success: false, message: `Error en el servidor: ${err.message || 'Desconocido'}` }
+    return { success: false, message: "Credenciales corporativas incorrectas o acceso denegado." };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: "Error al procesar la solicitud." };
   }
 }

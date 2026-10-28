@@ -1,33 +1,26 @@
-'use server'
+"use server";
+import { neon } from "@neondatabase/serverless";
+import { cookies } from "next/headers";
 
-import { neon } from '@neondatabase/serverless'
+const sql = neon(process.env.DATABASE_URL!);
 
-const sql = neon(process.env.DATABASE_URL="postgresql://neondb_owner:npg_Ur4c6uKOFVaS@ep-crimson-dream-b49s2cbz-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require");
-export async function loginPaciente(email: string, passwordInput: string) {
+export async function loginPaciente(formData: FormData) {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+
   try {
-    // Buscamos al paciente por su correo electrónico en Neon
-    const pacientes = await sql`
-      SELECT * FROM patients WHERE email = ${email}
-    `
-
-    if (pacientes.length === 0) {
-      return { success: false, message: 'Correo electrónico no registrado.' }
+    const user = await sql`SELECT id, nombre_completo FROM patients WHERE email = ${email} AND password_hash = ${password}`;
+    
+    if (user.length > 0) {
+      // Se agrega el await para resolver la promesa de cookies()
+      const cookieStore = await cookies();
+      cookieStore.set("session_user", JSON.stringify({ id: user[0].id, role: "paciente", nombre: user[0].nombre_completo }), { httpOnly: true, path: '/' });
+      return { success: true, url: "/paciente" };
     }
-
-    const paciente = pacientes[0]
-
-    // Validamos la contraseña
-    if (paciente.password_hash !== passwordInput) {
-      return { success: false, message: 'Contraseña incorrecta.' }
-    }
-
-    return { 
-      success: true, 
-      message: '¡Bienvenido!', 
-      pacienteId: paciente.id 
-    }
-  } catch (error: unknown) {
-    const err = error as { message?: string }
-    return { success: false, message: `Error en el servidor: ${err.message || 'Desconocido'}` }
+    
+    return { success: false, message: "Correo o contraseña incorrectos." };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: "Error de conexión con la base de datos." };
   }
 }
